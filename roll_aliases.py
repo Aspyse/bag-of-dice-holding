@@ -10,7 +10,7 @@ with open(schema_file, 'r') as rf:
         schema = rf.read()
 
 async def savedice(user, name, notation):
-    notation = cleanroll(notation)
+    notation = await cleanroll(notation)
 
     if not check_db(db_file):
         async with aiosqlite.connect(db_file) as conn:         
@@ -19,7 +19,8 @@ async def savedice(user, name, notation):
             print('Created the Table! Now inserting')
 
     conn = await aiosqlite.connect(db_file)
-    await conn.execute("INSERT INTO dice VALUES (?, ?, ?)", (user, name, notation))
+    await conn.execute("INSERT INTO dice VALUES (?, ?, ?)", (user, str(name), notation))
+    await conn.commit()
     print('Inserted values into the table!')
     await conn.close()
     print('Closed the connection!')
@@ -31,7 +32,7 @@ async def getdice(user):
     cursor = await conn.cursor()
     await cursor.execute("SELECT * FROM dice WHERE user=?", (user,))
     rows = await cursor.fetchall()
-    loop.create_task(conn.close())
+    await conn.close()
     return rows
 
 def check_db(filename):

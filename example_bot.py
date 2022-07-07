@@ -23,14 +23,26 @@ async def store(ctx, alias: discord.Option(str), notation: discord.Option(str)):
 
 @bot.slash_command(description="Brings up an rollable list of saved dice notations.")
 async def dicebag(ctx):
-    saveddice = await getdice(ctx.user)
+    saveddice = await getdice(ctx.user.id)
     print(saveddice)
     if len(saveddice) < 1:
         await ctx.respond(f"No dice :(")
     else:
-        await ctx.respond(f"Opening {ctx.user.display_name}'s dice bag", dicebag=discord.ui.View()) # Send a message with our View class that contains the button
+        dicebag = discord.ui.View()
         for die in saveddice:
-            print(die)
+            bruh = DiceButton(ctx, die[1], die[2])
+            dicebag.add_item(bruh)
+        await ctx.respond(f"Opening {ctx.user.display_name}'s dice bag", view=dicebag) # Send a message with our View class that contains the button
+
+class DiceButton(discord.ui.Button):
+    def __init__(self, ctx, label, command):
+        super().__init__(label=label, style=discord.ButtonStyle.primary)
+        self.ctx = ctx
+        self.command = command
+    
+    async def callback(self, interaction):
+        self.outroll = await rolldice(self.command)
+        await self.ctx.respond(f"{self.ctx.author.display_name}'s {self.label}: `{self.outroll[1]}` = {self.outroll[2]}")
 
 if __name__ == '__main__':
     import config
