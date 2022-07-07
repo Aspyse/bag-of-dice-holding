@@ -1,9 +1,10 @@
 import re
 import random
 
-def roll(command):
-    command = cleanroll(command)
-    dice = command.split('+')
+async def rolldice(notation):
+    notation = await cleanroll(notation)
+
+    dice = notation.split('+')
     rolls = []
     total = 0
     for die in dice:
@@ -16,9 +17,9 @@ def roll(command):
                 rolls.append(bruh)
                 total += bruh
 
-    return (command, rolls, total)
+    return (notation, rolls, total)
 
-def cleanroll(command):
-    command.strip()
-    command = re.sub("[^d0-9+]","", command)
-    return command
+async def cleanroll(notation):
+    notation.strip()
+    notation = re.sub("[^d0-9+]","", notation)
+    return notation
