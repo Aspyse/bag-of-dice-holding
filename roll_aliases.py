@@ -1,14 +1,14 @@
 import sqlite3
-#import os
+import os
 from rolling_implementation import cleanroll
 
-def savedice(command, user, guild):
+def savedice(command, user):
     command = command.split(' ')
     name = command[0]
     roll = cleanroll(command[1])
     
 
-    db_file = f'{guild}{user}.db'
+    db_file = 'database.db'
     schema_file = 'schema.sql'
     
     with open(schema_file, 'r') as rf:
@@ -31,7 +31,7 @@ def savedice(command, user, guild):
         print('Inserted values into the table!')
     print('Closed the connection!')
 
-    return f"alias created {name} -> {roll} in {guild}"
+    return (name, roll)
 
-#def check_db(filename):
-#    return os.path.exists(filename)
+def check_db(filename):
+    return os.path.exists(filename)

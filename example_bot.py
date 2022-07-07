@@ -18,7 +18,8 @@ class MyClient(discord.Client):
 
         if message.content.startswith("!savedice"):
             #FORMAT OUTPUT MESSAGE HERE INSTEAD
-            await message.channel.send(savedice(message.content.replace("!savedice ", ''), message.author.id, message.guild.id))
+            saveexit = savedice(message.content.replace("!savedice ", ''), message.author.id)
+            await message.channel.send(f"Alias *{saveexit[0]}* created: `{saveexit[1]}`")
 
 intents = discord.Intents.default()
 intents.message_content = True
