@@ -12,12 +12,6 @@ with open(schema_file, 'r') as rf:
 async def savedice(user, name, notation):
     notation = await cleanroll(notation)
 
-    if not check_db(db_file):
-        async with aiosqlite.connect(db_file) as conn:         
-            # Execute the SQL query to create the table
-            await conn.executescript(schema)
-            print('Created the Table! Now inserting')
-
     conn = await aiosqlite.connect(db_file)
     await conn.execute("INSERT INTO dice VALUES (?, ?, ?)", (user, str(name), notation))
     await conn.commit()
@@ -39,5 +33,27 @@ async def getdice(user):
     await conn.close()
     return rows
 
-def check_db(filename):
-    return os.path.exists(filename)
+async def removedice(user, alias):
+    conn = await aiosqlite.connect(db_file)
+    await conn.execute("DELETE FROM dice WHERE user=? AND alias=?", (user, alias))
+    await conn.commit()
+    await conn.close()
+
+async def updatedice(user, alias1, alias2, notation):
+    conn = await aiosqlite.connect(db_file)
+    cursor = await conn.cursor()
+    await cursor.execute("SELECT * FROM dice WHERE user=? AND alias=?", (user, alias2))
+    rows = await cursor.fetchall()
+    print(rows)
+    if alias1 == alias2 or len(rows) < 1:
+        await conn.execute("UPDATE dice SET alias=?, command=? WHERE user=? AND alias=?", (alias2, notation, user, alias1))
+        await conn.commit()
+    await conn.close()
+
+async def check_db():
+    if not os.path.exists(db_file):
+        print("hi")
+        conn = await aiosqlite.connect(db_file)
+        await conn.executescript(schema)
+        print('Created the Table! Now inserting')
+    return 
