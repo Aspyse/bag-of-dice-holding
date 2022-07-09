@@ -1,25 +1,56 @@
 import re
 import random
 
-async def rolldice(notation):
+async def rollnotation(notation):
     notation = await cleanroll(notation)
 
-    dice = notation.split('+')
+    addgroup = notation.split('+')
     rolls = []
     total = 0
-    for die in dice:
-        if 'd' not in die:
-            total += int(die)
-        else:
-            bonk = die.split('d')
-            for i in range(int(bonk[0])):
-                bruh = random.randint(1,int(bonk[1]))
-                rolls.append(bruh)
-                total += bruh
+
+    for add in addgroup:
+        subgroup = add.split('-')
+        for sub in range(len(subgroup)):
+            if 'd' not in subgroup[sub]:
+                if sub == 0:
+                    groupdiff = int(subgroup[sub])
+                else:
+                    groupdiff -= int(subgroup[sub])
+
+            else:
+                advantage = await advtonum(subgroup[sub])
+                subgroup[sub] = re.sub("[AD]","", subgroup[sub])
+                roll = await rolldice(subgroup[sub])
+                rolls.append(roll)
+                if not advantage == 0:
+                    advroll = await rolldice(subgroup[sub])
+                    rolls.append(advroll)
+                    roll = max(roll*advantage, advroll*advantage)*advantage
+                    
+                if sub == 0:
+                    groupdiff = roll
+                else:
+                    groupdiff -= roll
+
+        total += groupdiff
 
     return (notation, rolls, total)
 
+async def rolldice(dice):
+    dicesplit = dice.split('d')
+    for i in range(int(dicesplit[0])):
+        roll = random.randint(1,int(dicesplit[1]))
+    return roll
+
+async def advtonum(advantage):
+    if advantage[0] == 'A':
+        return 1
+    elif advantage[0] == 'D':
+        return -1
+    else:
+        return 0
+
 async def cleanroll(notation):
     notation.strip()
-    notation = re.sub("[^d0-9+]","", notation)
+    notation = re.sub("[^d0-9+-AD]","", notation)
     return notation

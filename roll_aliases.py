@@ -21,11 +21,15 @@ async def savedice(user, name, notation):
     conn = await aiosqlite.connect(db_file)
     await conn.execute("INSERT INTO dice VALUES (?, ?, ?)", (user, str(name), notation))
     await conn.commit()
-    print('Inserted values into the table!')
     await conn.close()
-    print('Closed the connection!')
 
     return (name, notation)
+
+async def deletealldice(user):
+    conn = await aiosqlite.connect(db_file)
+    await conn.execute("DELETE FROM dice WHERE user=?", (user,))
+    await conn.commit()
+    await conn.close()
 
 async def getdice(user):
     conn = await aiosqlite.connect(db_file)
