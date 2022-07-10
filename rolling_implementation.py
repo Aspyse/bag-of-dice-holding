@@ -58,8 +58,8 @@ async def advtonum(advantage):
 async def cleanroll(notation):
     notation.strip()
     notation = re.sub("[^d0-9+-AD]","", notation)
-    notationsplit = re.split("+ |-", notation)
+    notationsplit = re.split("[+-]", notation)
     for i in range(len(notationsplit)):
         notationsplit[i].replace('d', 'R').replace('R', 'd', 1).replace('R', '')
-    notation = notationsplit.join
+    notation = ''.join(notationsplit)
     return notation
