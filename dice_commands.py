@@ -21,7 +21,7 @@ async def helpdice(ctx):
     helpembed.add_field(name="`/deletedice`", value="Delete existing dice saved in your bag.")
     helpembed.add_field(name="`/cleardice`", value="Clears all dice saved in your bag.")
     helpembed.add_field(name="Notation", value="Follows standard D&D dice notation, with an optional capital A at the start for advantage, or D for disadvantage. A saved die can use addition (+) or subtraction (-), as well as use multiple dice in one save slot.\nEx: **Disadvantaged Precision Attack Roll**: `D1d20+6+1d8`", inline=True)
-    helpembed.set_footer(text="Currently, the Bag of Dice Holding can only hold a maximum of 25 dice at once. Interactable commands also expire after 5 minutes.")
+    helpembed.set_footer(text="Currently, the Bag of Dice Holding can only hold a maximum of 25 dice at once.\nInteractable commands expire after 5 minutes (Interaction fails).")
     await ctx.respond(embeds=[helpembed], ephemeral=True)
 
 @bot.slash_command(description="Roll using dice notation.")
