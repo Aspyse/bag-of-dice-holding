@@ -11,6 +11,8 @@ async def rollnotation(notation):
     for add in addgroup:
         subgroup = add.split('-')
         for sub in range(len(subgroup)):
+            advantage = await advtonum(subgroup[sub])
+            subgroup[sub] = re.sub("[AD]","", subgroup[sub])
             if 'd' not in subgroup[sub]:
                 if sub == 0:
                     groupdiff = int(subgroup[sub])
@@ -18,8 +20,6 @@ async def rollnotation(notation):
                     groupdiff -= int(subgroup[sub])
 
             else:
-                advantage = await advtonum(subgroup[sub])
-                subgroup[sub] = re.sub("[AD]","", subgroup[sub])
                 roll = await rolldice(subgroup[sub])
                 rolls.append(roll)
                 if not advantage == 0:
