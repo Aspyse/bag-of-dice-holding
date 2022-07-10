@@ -43,6 +43,7 @@ async def removedice(user, alias):
     await conn.close()
 
 async def updatedice(user, alias1, alias2, notation):
+    notation = await cleanroll(notation)
     conn = await aiosqlite.connect(db_file)
     cursor = await conn.cursor()
     await cursor.execute("SELECT * FROM dice WHERE user=? AND alias=?", (user, alias2))
