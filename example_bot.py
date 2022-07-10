@@ -11,6 +11,12 @@ async def on_ready():
     print(f"Logged in as {bot.user} (ID: {bot.user.id})")
     print("------")
 
+@bot.slash_command(description="Pops up command list for Bag of Dice Holding.")
+async def helpdice():
+    helpembed = discord.Embed(title="How to use your Bag of Dice Holding", description="Here are the commands and notation you will need to know to get started with Bag of Dice Holding:", color=discord.Color.from_rgb(255, 201, 14))
+    helpembed.add_field(name="/dicebag", value="The main command you will be using. Use this to open an inventory for adding and rolling stored dice.")
+    helpembed.add_field(name="/roll", value="For rolls that you don't necessarily want to store in your bag. See notation section at the bottom.")
+
 @bot.slash_command(description="Rolls using dice notation.")
 async def roll(ctx, dice: discord.Option(str)):
     outroll = await rollnotation(dice)
