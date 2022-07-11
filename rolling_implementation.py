@@ -38,6 +38,11 @@ async def rollnotation(notation):
 
 async def rolldice(dice):
     dicesplit = dice.split('d')
+    if dice[-1] == 'd':
+        return 0
+    if dice[0] == 'd':
+        dicesplit.append(dicesplit[0])
+        dicesplit[0] = 1
     for i in range(int(dicesplit[0])):
         roll = random.randint(1,int(dicesplit[1]))
     return roll
@@ -53,4 +58,11 @@ async def advtonum(advantage):
 async def cleanroll(notation):
     notation.strip()
     notation = re.sub("[^d0-9+-AD]","", notation)
+    notationsplit = notation.split('+')
+    for add in notationsplit:
+        subsplit = add.split('-')
+        for sub in subsplit:
+            sub.replace('d', 'R').replace('R', 'd', 1).replace('R', '')
+        subjoin = '-'.join(subsplit)
+    addjoin = '+'.join(notationsplit)
     return notation

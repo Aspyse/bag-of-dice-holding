@@ -43,6 +43,7 @@ async def removedice(user, alias):
     await conn.close()
 
 async def updatedice(user, alias1, alias2, notation):
+    notation = await cleanroll(notation)
     conn = await aiosqlite.connect(db_file)
     cursor = await conn.cursor()
     await cursor.execute("SELECT * FROM dice WHERE user=? AND alias=?", (user, alias2))
@@ -53,8 +54,6 @@ async def updatedice(user, alias1, alias2, notation):
 
 async def check_db():
     if not os.path.exists(db_file):
-        print("hi")
         conn = await aiosqlite.connect(db_file)
         await conn.executescript(schema)
-        print('Created the Table! Now inserting')
     return 
