@@ -13,7 +13,7 @@ class EncountersCog(discord.Cog):
         encounter = Encounter()
         print("encounter started")
         # STORE IN RAM
-        initiativeview = InitiativeView()
+
         # (button) add character and initiative roll notation, optionally roll from saved dice
         # ^ use username by default?
         # ^ use saved dice "initiative" by default, roll if missing
@@ -30,6 +30,16 @@ class EncountersCog(discord.Cog):
         # remove characters from queue
 
         # reaction tracker would be great also
+
+        await ctx.response.send_message()
+        await ctx.respond("An encounter is brewing...", embeds=[playerlist])
+
+async def showinitiativeembed():
+    #todo
+
+    initiativeembed = discord.Embed(title="Who's fighting?")
+    #todo
+    return initiativeembed
 
 class InitiativeView(discord.ui.View):
     def __init__(self, encounter):
@@ -49,9 +59,10 @@ class CharacterModal(discord.ui.Modal):
         self.add_item(discord.ui.InputText(label="Initiative Roll"), value = initiativeroll)
 
     async def callback(self, interaction):
-        # roll for initiative
         character = Character(self.children[0].value, self.children[1].value)
         await self.encounter.addcharacter(character)
+        initiativeview = showinitiativeview()
+        interaction.response.edit_message(self.message, "smth", view=initiativeview)
         
 class Encounter():
     def __init__(self):
