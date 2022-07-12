@@ -4,7 +4,7 @@ from rolling_implementation import *
 encounter = discord.SlashCommandGroup("encounter", "Encounter commands from Bag of Dice Holding")
 
 @encounter.command(description="Starts an encounter. Let your DM invoke this command.")
-async def start(self, ctx,
+async def start(ctx,
     surprise: discord.Option(required = False, choices=[discord.OptionChoice(name="Players"), discord.OptionChoice(name="Enemies")])
 ):
     encounter = Encounter()

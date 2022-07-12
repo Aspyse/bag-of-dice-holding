@@ -10,7 +10,7 @@ bot.add_application_command(dice)
 from help import help
 bot.add_application_command(help)
 
-from encounters import encounters
+from encounter import encounter
 bot.add_application_command(encounters)
 
 from utility import utility
