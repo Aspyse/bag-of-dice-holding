@@ -3,26 +3,15 @@ from rolling_implementation import *
 from roll_aliases import *
 
 intents = discord.Intents.default()
-activity = discord.Activity(type=discord.ActivityType.listening, name="/helpdice")
+activity = discord.Activity(type=discord.ActivityType.listening, name="/helpbag")
 bot = discord.Bot(activity=activity)
+from help import HelpCog
+bot.add_cog(HelpCog(bot))
 
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user} (ID: {bot.user.id})")
     print("------")
-
-@bot.slash_command(description="Pop up command list for Bag of Dice Holding.")
-async def helpdice(ctx):
-    helpembed = discord.Embed(title="How to Use Your Bag of Dice Holding", description="Here are the commands and notation you will need to know to get started with Bag of Dice Holding:", color=discord.Color.from_rgb(255, 201, 14))
-    helpembed.add_field(name="`/dicebag`", value="The main command you will be using. Opens an inventory for creating and rolling saved dice.")   
-    helpembed.add_field(name="`/roll`", value="Manually make a roll using dice notation.")
-    helpembed.add_field(name="`/storedice`", value="Manually save a die to your bag.")
-    helpembed.add_field(name="`/editdice`", value="Edit existing dice saved in your bag.")
-    helpembed.add_field(name="`/deletedice`", value="Delete existing dice saved in your bag.")
-    helpembed.add_field(name="`/cleardice`", value="Clears all dice saved in your bag.")
-    helpembed.add_field(name="Notation", value="Follows standard D&D dice notation, with an optional capital A at the start for advantage, or D for disadvantage. A saved die can use addition (+) or subtraction (-), as well as use multiple dice in one save slot.\nEx: **Disadvantaged Precision Attack Roll**: `D1d20+6+1d8`", inline=True)
-    helpembed.set_footer(text="Currently, the Bag of Dice Holding can only hold a maximum of 25 dice at once.\nInteractable commands expire after 5 minutes (Interaction fails).")
-    await ctx.respond(embeds=[helpembed], ephemeral=True)
 
 @bot.slash_command(description="Roll using dice notation.")
 async def roll(ctx, dice: discord.Option(str)):
@@ -84,9 +73,9 @@ class DiceButton(discord.ui.Button):
         self.command = command
     
     async def callback(self, interaction):
-        self.outroll = await rollnotation(self.command)
+        outroll = await rollnotation(self.command)
         #SHOULD NOT BE EPHEMERAL
-        await interaction.response.send_message(f"{interaction.user.display_name}'s **{self.label}** ({self.command}): `{self.outroll[1]}` = {self.outroll[2]}")
+        await interaction.response.send_message(f"{interaction.user.display_name}'s **{self.label}** ({self.command}): `{outroll[1]}` = {outroll[2]}")
 
 class StoreModal(discord.ui.Modal):
     def __init__(self, message, *args, **kwargs) -> None:
@@ -186,12 +175,10 @@ class EditButton(discord.ui.Button):
 class EditModal(discord.ui.Modal):
     def __init__(self, alias, command, message, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.alias = alias
-        self.command = command
         self.message = message
 
-        self.add_item(discord.ui.InputText(label="Name", placeholder=self.alias))
-        self.add_item(discord.ui.InputText(label="Dice Roll", placeholder=self.command))
+        self.add_item(discord.ui.InputText(label="Name", value=alias))
+        self.add_item(discord.ui.InputText(label="Dice Roll", value=command))
 
     async def callback(self, interaction):
         await updatedice(interaction.user.id, self.alias, self.children[0].value, self.children[1].value)
