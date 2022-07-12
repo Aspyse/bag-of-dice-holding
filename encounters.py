@@ -1,38 +1,35 @@
 import discord
-from discord.ext import commands
 from rolling_implementation import *
 
-class EncountersCog(discord.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-    
-    @commands.slash_command(description="Starts an encounter. Let your DM invoke this command.")
-    async def startencounter(self, ctx,
-        surprise: discord.Option(required = False, choices=[discord.OptionChoice(name="Players"), discord.OptionChoice(name="Enemies")])
-    ):
-        encounter = Encounter()
-        print("encounter started")
-        # STORE IN RAM
+encounter = discord.SlashCommandGroup("encounter", "Encounter commands from Bag of Dice Holding")
 
-        # (button) add character and initiative roll notation, optionally roll from saved dice
-        # ^ use username by default?
-        # ^ use saved dice "initiative" by default, roll if missing
-        # ^ (button) dm add enemy/ies with initiative roll(s)
-        # (button) edit character and initiative roll notation
-        # (button?) cancel encounter
+@encounter.command(description="Starts an encounter. Let your DM invoke this command.")
+async def start(self, ctx,
+    surprise: discord.Option(required = False, choices=[discord.OptionChoice(name="Players"), discord.OptionChoice(name="Enemies")])
+):
+    encounter = Encounter()
+    print("encounter started")
+    # STORE IN RAM
 
-        # (button) roll for initiatives, sort characters by initiative, SURPRISE IS STATUS
-        # ^ delete initiatives message and make new view for queue
+    # (button) add character and initiative roll notation, optionally roll from saved dice
+    # ^ use username by default?
+    # ^ use saved dice "initiative" by default, roll if missing
+    # ^ (button) dm add enemy/ies with initiative roll(s)
+    # (button) edit character and initiative roll notation
+    # (button?) cancel encounter
 
-        # add status effect with duration
-        # track statuses with turn count
-        # move between turns
-        # remove characters from queue
+    # (button) roll for initiatives, sort characters by initiative, SURPRISE IS STATUS
+    # ^ delete initiatives message and make new view for queue
 
-        # reaction tracker would be great also
+    # add status effect with duration
+    # track statuses with turn count
+    # move between turns
+    # remove characters from queue
 
-        await ctx.response.send_message()
-        await ctx.respond("An encounter is brewing...", embeds=[playerlist])
+    # reaction tracker would be great also
+
+    await ctx.response.send_message()
+    await ctx.respond("An encounter is brewing...", embeds=[])
 
 async def showinitiativeembed():
     #todo
@@ -40,14 +37,6 @@ async def showinitiativeembed():
     initiativeembed = discord.Embed(title="Who's fighting?")
     #todo
     return initiativeembed
-
-class InitiativeView(discord.ui.View):
-    def __init__(self, encounter):
-        self.encounter = encounter
-
-    @discord.ui.button(label="Add player")
-    async def addplayer(self, button, interaction):
-        interaction.response.send_modal()
 
 class CharacterModal(discord.ui.Modal):
     def __init__(self, name, initiativeroll, encounter, message, *args, **kwargs) -> None:
@@ -61,8 +50,16 @@ class CharacterModal(discord.ui.Modal):
     async def callback(self, interaction):
         character = Character(self.children[0].value, self.children[1].value)
         await self.encounter.addcharacter(character)
-        initiativeview = showinitiativeview()
+        initiativeview = InitiativeView()
         interaction.response.edit_message(self.message, "smth", view=initiativeview)
+
+class InitiativeView(discord.ui.View):
+    def __init__(self, encounter):
+        self.encounter = encounter
+
+    @discord.ui.button(label="Add player")
+    async def addplayer(self, button, interaction):
+        interaction.response.send_modal()
         
 class Encounter():
     def __init__(self):

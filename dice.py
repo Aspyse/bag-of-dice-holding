@@ -2,18 +2,7 @@ import discord
 from rolling_implementation import *
 from roll_aliases import *
 
-intents = discord.Intents.default()
-activity = discord.Activity(type=discord.ActivityType.listening, name="/helpbag")
-bot = discord.Bot(activity=activity)
-from help import HelpCog
-bot.add_cog(HelpCog(bot))
-
-@bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user} (ID: {bot.user.id})")
-    print("------")
-
-dice = bot.create_group("dice", "Dice-related commands from Bag of Dice Holding")
+dice = discord.SlashCommandGroup("dice", "Dice and bag commands from Bag of Dice Holding")
 
 @dice.command(description="Roll using dice notation.")
 async def roll(ctx, dice: discord.Option(str)):
@@ -30,7 +19,7 @@ async def save(ctx, alias: discord.Option(str), dice: discord.Option(str)):
 
 @dice.command(description="Delete all saved dice.")
 async def clear(ctx):
-    clearview = discord.ui.View(timeout=300)
+    clearview = discord.ui.View(timeout=120)
     yes = discord.ui.Button(label="Clear All Dice", operation=1)
     async def confirm(interaction):
         await deletealldice(interaction.user.id)
@@ -49,17 +38,18 @@ async def clear(ctx):
 
 @dice.command(description="Open your bag of saved dice.")
 async def bag(ctx):
-    bagview = await DiceBag.create(ctx.user.id, operation=0, timeout=300)
+    bagview = await DiceBag.create(ctx.user.id, operation=0, timeout=120)
     await bagview.addplusbutton()
     await ctx.respond(f"**{ctx.user.display_name}'s dice bag**", view=bagview, ephemeral=True)
 
 class DiceBag(discord.ui.View):
+    # needs to be async to use getdice from aiosqlite
     @classmethod
     async def create(cls, user, operation, *args, **kwargs):
         self = DiceBag()
         self.saveddice = await getdice(user)
         for die in self.saveddice:
-            self.add_item(await DiceButton.create(label=die[1], command=die[2], operation=operation))
+            self.add_item(await DiceButton(label=die[1], command=die[2], operation=operation))
         
         return self
 
@@ -91,16 +81,14 @@ class StoreModal(discord.ui.Modal):
         saveexit = await storedice(interaction.user.id, self.children[0].value, self.children[1].value)
         await interaction.response.send_message(f"Dice **{saveexit[0]}** saved: `{saveexit[1]}`", ephemeral=True)
 
-        bagview = await DiceBag.create(interaction.user.id, operation=0, timeout=300)
+        bagview = await DiceBag.create(interaction.user.id, operation=0, timeout=120)
         await bagview.addplusbutton()
         await interaction.followup.edit_message(self.message, view=bagview)
 
 class DiceButton(discord.ui.Button):
-    @classmethod
-    async def create(cls, label, command, operation, *args, **kwargs):
-        self = DiceButton()
+    # does not need to be async as long as callback is awaited
+    def __init__(self, command, operation, *args, **kwargs):
         self.command = command
-        self.label = label
         if operation == 0:
             self.style = discord.ButtonStyle.green
             self.callback = self.add_callback
@@ -110,8 +98,6 @@ class DiceButton(discord.ui.Button):
         else:
             self.style = discord.ButtonStyle.blurple
             self.callback = self.edit_callback
-        
-        return self
     
     async def add_callback(self, interaction):
         outroll = await rollnotation(self.command)
@@ -119,13 +105,13 @@ class DiceButton(discord.ui.Button):
         await interaction.response.send_message(f"{interaction.user.display_name}'s **{self.label}** ({self.command}): `{outroll[1]}` = {outroll[2]}")
 
     async def delete_callback(self, interaction):
-        confirmation = discord.ui.View(timeout=300)
+        confirmation = discord.ui.View(timeout=120)
         yes = discord.ui.Button(label="Delete", style=discord.ButtonStyle.red)
         async def confirm(confirminteraction):
             await removedice(confirminteraction.user.id, self.label)
             await confirminteraction.response.defer()
 
-            deleteview = await DiceBag.create(interaction.user.id, operation=1, timeout=300)
+            deleteview = await DiceBag.create(interaction.user.id, operation=1, timeout=120)
             await deleteview.adddonebutton("Deletion complete.")
             if len(deleteview.children) > 1:
                 await confirminteraction.followup.edit_message(interaction.message.id, view=deleteview)
@@ -150,7 +136,7 @@ class DiceButton(discord.ui.Button):
 
 @dice.command(description="Delete selected dice from bag.")
 async def delete(ctx):
-    deleteview = await DiceBag.create(ctx.user.id, operation=1, timeout=300)
+    deleteview = await DiceBag.create(ctx.user.id, operation=1, timeout=120)
     await deleteview.adddonebutton("Deletion complete.")
     if len(deleteview.children) > 1:
         await ctx.respond(f"**Deleting from {ctx.user.display_name}'s dice bag**", view=deleteview, ephemeral=True)
@@ -159,7 +145,7 @@ async def delete(ctx):
 
 @dice.command(description="Edit existing dice from bag.")
 async def edit(ctx):
-    editview = await DiceBag.create(ctx.user.id, operation=2, timeout=300)
+    editview = await DiceBag.create(ctx.user.id, operation=2, timeout=120)
     await editview.adddonebutton("Editing complete.")
     await ctx.respond(f"**Editing {ctx.user.display_name}'s dice**", view=editview, ephemeral=True)
 
@@ -179,10 +165,6 @@ class EditModal(discord.ui.Modal):
         else:
             await interaction.response.send_message(f"Dice **{self.alias}** updated to **{self.children[0].value}**: `{self.children[1].value}`", ephemeral=True)
         
-        editview = await DiceBag.create(interaction.user.id, operation=2, timeout=300)
+        editview = await DiceBag.create(interaction.user.id, operation=2, timeout=120)
         await editview.adddonebutton("Editing complete.")
         await interaction.followup.edit_message(self.message, view=editview)
-
-if __name__ == '__main__':
-    import config
-    bot.run(config.token)
