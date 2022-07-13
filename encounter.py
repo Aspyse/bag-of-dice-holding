@@ -4,10 +4,10 @@ from rolling_implementation import *
 encounter = discord.SlashCommandGroup("encounter", "Encounter commands from Bag of Dice Holding")
 
 @encounter.command(description="Starts an encounter. Let your DM invoke this command.")
-async def start(ctx,
-    surprise: discord.Option(required = False, choices=[discord.OptionChoice(name="Players"), discord.OptionChoice(name="Enemies")])
+async def start(ctx, surprise: discord.Option(required = False, choices=[
+    discord.OptionChoice(name="Players"),
+    discord.OptionChoice(name="Enemies")])
 ):
-    encounter = Encounter()
     print("encounter started")
     # STORE IN RAM
 
@@ -28,8 +28,10 @@ async def start(ctx,
 
     # reaction tracker would be great also
 
-    await ctx.response.send_message()
-    await ctx.respond("An encounter is brewing...", embeds=[])
+    encounter = Encounter()
+    initiativeview = InitiativeView()
+    initiativeembed = await showinitiativeembed()
+    await ctx.respond("An encounter is brewing...", embeds=initiativeembed, view=initiativeview)
 
 async def showinitiativeembed():
     #todo

@@ -49,7 +49,7 @@ class DiceBag(discord.ui.View):
         self = DiceBag()
         self.saveddice = await getdice(user)
         for die in self.saveddice:
-            self.add_item(await DiceButton(label=die[1], command=die[2], operation=operation))
+            self.add_item(DiceButton(label=die[1], command=die[2], operation=operation))
         
         return self
 
@@ -69,25 +69,10 @@ class DiceBag(discord.ui.View):
         donebutton.callback = done
         self.add_item(donebutton)
 
-class StoreModal(discord.ui.Modal):
-    def __init__(self, message, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.message = message
-
-        self.add_item(discord.ui.InputText(label="Name"))
-        self.add_item(discord.ui.InputText(label="Dice Roll"))
-
-    async def callback(self, interaction):
-        saveexit = await storedice(interaction.user.id, self.children[0].value, self.children[1].value)
-        await interaction.response.send_message(f"Dice **{saveexit[0]}** saved: `{saveexit[1]}`", ephemeral=True)
-
-        bagview = await DiceBag.create(interaction.user.id, operation=0, timeout=120)
-        await bagview.addplusbutton()
-        await interaction.followup.edit_message(self.message, view=bagview)
-
 class DiceButton(discord.ui.Button):
     # does not need to be async as long as callback is awaited
     def __init__(self, command, operation, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.command = command
         if operation == 0:
             self.style = discord.ButtonStyle.green
@@ -133,6 +118,22 @@ class DiceButton(discord.ui.Button):
 
     async def edit_callback(self, interaction):
         await interaction.response.send_modal(EditModal(alias=self.label, command=self.command, message=interaction.message.id, title="Edit dice values"))
+
+class StoreModal(discord.ui.Modal):
+    def __init__(self, message, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.message = message
+
+        self.add_item(discord.ui.InputText(label="Name"))
+        self.add_item(discord.ui.InputText(label="Dice Roll"))
+
+    async def callback(self, interaction):
+        saveexit = await storedice(interaction.user.id, self.children[0].value, self.children[1].value)
+        await interaction.response.send_message(f"Dice **{saveexit[0]}** saved: `{saveexit[1]}`", ephemeral=True)
+
+        bagview = await DiceBag.create(interaction.user.id, operation=0, timeout=120)
+        await bagview.addplusbutton()
+        await interaction.followup.edit_message(self.message, view=bagview)
 
 @dice.command(description="Delete selected dice from bag.")
 async def delete(ctx):

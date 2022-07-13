@@ -1,7 +1,7 @@
 import discord
 
 intents = discord.Intents.default()
-activity = discord.Activity(type=discord.ActivityType.listening, name="/help bag")
+activity = discord.Activity(type=discord.ActivityType.listening, name="/help tricks")
 bot = discord.Bot(activity=activity)
 
 from dice import dice
@@ -14,7 +14,7 @@ from encounter import encounter
 bot.add_application_command(encounter)
 
 from utility import utility
-# bot.add_application_command(utility)
+bot.add_application_command(utility)
 
 from chance import chance
 bot.add_application_command(chance)
