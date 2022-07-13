@@ -13,7 +13,7 @@ async def dice(ctx):
     helpembed.add_field(name="`/clear`", value="Clears all dice saved in your bag.")
     helpembed.add_field(name="Notation", value="Follows standard D&D dice notation, with an optional capital A at the start for advantage, or D for disadvantage. A saved die can use addition (+) or subtraction (-), as well as use multiple dice in one save slot.\nEx: **Disadvantaged Precision Attack Roll**: `D1d20+6+1d8`", inline=False)
     helpembed.add_field(name="Limitations", value="Currently, the Bag of Dice Holding can only hold a maximum of 25 dice at once.\nInteractable commands expire after 2 minutes (Interaction fails).", inline=False)
-    helpembed.set_footer(text="Buy me a coffee :) https://ko-fi.com/aspyse")
+    helpembed.set_footer(text="Buy me a coffee! https://ko-fi.com/aspyse")
     await ctx.respond(embeds=[helpembed], ephemeral=True)
 
 @help.command(description="Encounter guide for Bag of Dice Holding.")
