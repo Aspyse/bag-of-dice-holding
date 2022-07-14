@@ -7,17 +7,16 @@ bot = discord.Bot(activity=activity)
 from dice import dice
 bot.add_application_command(dice)
 
-from help import help
-bot.add_application_command(help)
-
 from encounter import encounter
 bot.add_application_command(encounter)
+
+from chance import chance
+bot.add_application_command(chance)
 
 from utility import utility
 bot.add_application_command(utility)
 
-from chance import chance
-bot.add_application_command(chance)
+bot.load_extension('help')
 
 @bot.event
 async def on_ready():
