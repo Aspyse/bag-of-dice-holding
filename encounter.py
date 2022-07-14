@@ -30,14 +30,15 @@ async def start(ctx, surprise: discord.Option(required = False, choices=[
 
     encounter = Encounter()
     initiativeview = InitiativeView()
-    initiativeembed = await showinitiativeembed()
+    initiativeembed = await showinitiativeembed(encounter)
     await ctx.respond("An encounter is brewing...", embeds=initiativeembed, view=initiativeview)
 
-async def showinitiativeembed():
+async def showinitiativeembed(encounter):
     #todo
-
     initiativeembed = discord.Embed(title="Who's fighting?")
     #todo
+    for character in encounter.characters:
+        initiativeembed.add_field(name=character.name, value=f"Initiative roll: {character.initiativeroll}")
     return initiativeembed
 
 class CharacterModal(discord.ui.Modal):
@@ -65,15 +66,25 @@ class InitiativeView(discord.ui.View):
         
 class Encounter():
     def __init__(self):
-        self.players = []
-        self.enemies = []
+        self.characters = []
         print("encounter made")
 
     async def addcharacter(self, character):
-        if character.isplayer:
-            self.players.append[character]
-        else:
-            self.enemies.append[character]
+        self.characters.append(character)
+
+    async def getplayers(self):
+        players = []
+        for character in self.characters:
+            if character.isplayer:
+                players.append(character)
+        return players
+
+    async def getenemies(self):
+        enemies = []
+        for character in self.characters:
+            if not character.isplayer:
+                enemies.append(character)
+        return enemies
 
 class Character():
     def __init__(self, name, initiativeroll, isplayer=True):
