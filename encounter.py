@@ -1,5 +1,6 @@
 import discord
 from rolling_implementation import *
+from roll_aliases import *
 
 encounter = discord.SlashCommandGroup("encounter", "Encounter commands from Bag of Dice Holding")
 
@@ -11,12 +12,12 @@ async def start(ctx, surprise: discord.Option(required = False, choices=[
     print("encounter started")
     # STORE IN RAM
 
-    # (button) add character and initiative roll notation, optionally roll from saved dice
-    # ^ use username by default?
-    # ^ use saved dice "initiative" by default, roll if missing
-    # ^ (button) dm add enemy/ies with initiative roll(s)
+    # DONE (button) add character and initiative roll notation, optionally roll from saved dice
+    # DONE ^ use username by default?
+    # DONE ^ use saved dice "initiative" by default, roll if missing
+    # DONE-ISH ^ (button) dm add enemy/ies with initiative roll(s)
     # (button) edit character and initiative roll notation
-    # (button?) cancel encounter
+    # DONE (button?) cancel encounter
 
     # (button) roll for initiatives, sort characters by initiative, SURPRISE IS STATUS
     # ^ delete initiatives message and make new view for queue
@@ -29,41 +30,82 @@ async def start(ctx, surprise: discord.Option(required = False, choices=[
     # reaction tracker would be great also
 
     encounter = Encounter()
-    initiativeview = InitiativeView()
-    initiativeembed = await showinitiativeembed(encounter)
-    await ctx.respond("An encounter is brewing...", embeds=initiativeembed, view=initiativeview)
+    initiativeview = InitiativeView(encounter)
+    initiativeembed = InitiativeEmbed("Who's in the fight?", encounter)
+    await ctx.respond("Encounter starting", embeds=initiativeembed, view=initiativeview)
 
-async def showinitiativeembed(encounter):
-    #todo
-    initiativeembed = discord.Embed(title="Who's fighting?")
-    #todo
-    for character in encounter.characters:
-        initiativeembed.add_field(name=character.name, value=f"Initiative roll: {character.initiativeroll}")
-    return initiativeembed
+class InitiativeEmbed(discord.Embed):
+    def __init__(self, encounter, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+        for character in encounter.characters:
+            self.add_field(name=character.name, value=f"Initiative roll: {character.initiativeroll}")
 
-class CharacterModal(discord.ui.Modal):
-    def __init__(self, name, initiativeroll, encounter, message, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.encounter = encounter
-        self.message = message
-
-        self.add_item(discord.ui.InputText(label="Character Name"), value = name)
-        self.add_item(discord.ui.InputText(label="Initiative Roll"), value = initiativeroll)
-
-    async def callback(self, interaction):
-        character = Character(self.children[0].value, self.children[1].value)
-        await self.encounter.addcharacter(character)
-        initiativeview = InitiativeView()
-        interaction.response.edit_message(self.message, "smth", view=initiativeview)
+#async def showinitiativeembed(encounter):
+#    initiativeembed = discord.Embed(title="Who's in the fight?")
+#    for character in encounter.characters:
+#        initiativeembed.add_field(name=character.name, value=f"Initiative roll: {character.initiativeroll}")
+#    return initiativeembed
 
 class InitiativeView(discord.ui.View):
     def __init__(self, encounter):
         self.encounter = encounter
 
     @discord.ui.button(label="Add player")
-    async def addplayer(self, button, interaction):
-        interaction.response.send_modal()
-        
+    async def playercallback(self, button, interaction):
+        await interaction.response.send_modal(await CharacterModal.create(interaction.user, self.encounter))
+    
+    @discord.ui.button(label="Add enemy")
+    async def enemycallback(self, button, interaction):
+        await interaction.response.send_modal(await CharacterModal.create(interaction.user, self.encounter, isplayer=False))
+
+    @discord.ui.button(label="Begin encounter")
+    async def begin(self, button, interaction):
+        for character in self.encounter.characters:
+            character.rollinitiative()
+        queueembed = QueueEmbed(self.encounter)
+
+    @discord.ui.button(label="Cancel")
+    async def cancel(self, button, interaction):
+        await interaction.response.defer()
+        await interaction.followup.edit_message(interaction.message, "Encounter cancelled.", view=None, embeds=None)
+
+class CharacterModal(discord.ui.Modal):
+    # not sure if completely necessary, could move getdice outside and pass output through parameters
+    @classmethod
+    async def create(cls, user, encounter, isplayer=True, *args, **kwargs):
+        self = CharacterModal()
+        self.encounter = encounter
+
+        saveddice = await getdice(user.id)
+        initiativeroll = ''
+        for dice in saveddice:
+            if dice[1].lowercase == "initiative":
+                initiativeroll = dice[2]
+                break
+
+        self.add_item(discord.ui.InputText(label="Character Name"), value = user.display_name)
+        self.add_item(discord.ui.InputText(label="Initiative Roll"), value = initiativeroll)
+
+        return self
+
+    async def callback(self, interaction):
+        character = Character(self.children[0].value, self.children[1].value, self.isplayer)
+        await self.encounter.addcharacter(character)
+        await interaction.response.send_message(f"{self.children[0]} has been created.", ephemeral=True)
+
+        initiativeembed = InitiativeEmbed("Who's in the fight?", encounter)
+        initiativeview = InitiativeView(self.encounter)
+        await interaction.followup.edit_message(interaction.message, "Encounter starting", emebeds=initiativeembed, view=initiativeview)
+    
+class QueueEmbed(discord.Embed):
+    def __init__(self, encounter, offset, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        #TODO: SORT ENCOUNTER.CHARACTERS BY INITIATIVE
+        charactercount = len(encounter.characters)
+        for i in range(charactercount):
+            character = encounter.characters[(offset+i)%charactercount]
+            self.add_field(name=character.name, value=f"Initiative: {character.initiative} Statuses: {character.statuses}")        
+
 class Encounter():
     def __init__(self):
         self.characters = []
