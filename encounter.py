@@ -1,3 +1,4 @@
+from faulthandler import disable
 import discord
 from rolling_implementation import *
 from roll_aliases import *
@@ -143,7 +144,8 @@ class QueueView(discord.ui.View):
         self.characterselect = discord.ui.Select(
             placeholder="Select Character",
             options=characters,
-            row=0
+            row=0,
+            disabled=True
         )
         self.characterselect.callback = self.selectcallback
         self.add_item(self.characterselect)
@@ -151,7 +153,7 @@ class QueueView(discord.ui.View):
     async def selectcallback(self, interaction):
         await interaction.response.defer()
     
-    @discord.ui.button(label="print character name or smn", row=1)
+    @discord.ui.button(label="Print Character Name", row=1, disabled=True)
     async def printchar(self, button, interaction):
         if len(self.characterselect.values) > 0:
             await interaction.response.send_message(self.characterselect.values[0], ephemeral=True)
