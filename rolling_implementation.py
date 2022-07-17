@@ -10,6 +10,7 @@ async def rollnotation(notation):
 
     for add in addgroup:
         subgroup = add.split('-')
+        groupdiff = 0
         for sub in range(len(subgroup)):
             advantage = await advtonum(subgroup[sub])
             subgroup[sub] = re.sub("[AD]","", subgroup[sub])
@@ -20,17 +21,23 @@ async def rollnotation(notation):
                     groupdiff -= int(subgroup[sub])
 
             else:
-                roll = await rolldice(subgroup[sub])
-                rolls.append(roll)
+                rolltotal=0
+                for i in range(int(subgroup[sub][0])):
+                    roll = await rolldice(subgroup[sub])
+                    rolls.append(roll)
+                    rolltotal += roll
                 if not advantage == 0:
-                    advroll = await rolldice(subgroup[sub])
-                    rolls.append(advroll)
-                    roll = max(roll*advantage, advroll*advantage)*advantage
+                    advrolltotal=0
+                    for i in range(int(subgroup[sub][0])):
+                        advroll = await rolldice(subgroup[sub])
+                        rolls.append(advroll)
+                        advrolltotal += advroll
+                    rolltotal = max(rolltotal*advantage, advrolltotal*advantage)*advantage
                     
                 if sub == 0:
-                    groupdiff = roll
+                    groupdiff += rolltotal
                 else:
-                    groupdiff -= roll
+                    groupdiff -= rolltotal
 
         total += groupdiff
 

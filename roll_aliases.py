@@ -1,3 +1,4 @@
+from tabnanny import check
 import aiosqlite
 import os
 from rolling_implementation import cleanroll
@@ -10,6 +11,7 @@ with open(schema_file, 'r') as rf:
         schema = rf.read()
 
 async def storedice(user, name, notation):
+    await check_db()
     notation = await cleanroll(notation)
 
     conn = await aiosqlite.connect(db_file)
@@ -23,12 +25,14 @@ async def storedice(user, name, notation):
     await conn.close()
 
 async def deletealldice(user):
+    await check_db()
     conn = await aiosqlite.connect(db_file)
     await conn.execute("DELETE FROM dice WHERE user=?", (user,))
     await conn.commit()
     await conn.close()
 
 async def getdice(user):
+    await check_db()
     conn = await aiosqlite.connect(db_file)
     cursor = await conn.cursor()
     await cursor.execute("SELECT * FROM dice WHERE user=?", (user,))
@@ -37,12 +41,14 @@ async def getdice(user):
     return rows
 
 async def removedice(user, alias):
+    await check_db()
     conn = await aiosqlite.connect(db_file)
     await conn.execute("DELETE FROM dice WHERE user=? AND alias=?", (user, alias))
     await conn.commit()
     await conn.close()
 
 async def updatedice(user, alias1, alias2, notation):
+    await check_db()
     notation = await cleanroll(notation)
     conn = await aiosqlite.connect(db_file)
     cursor = await conn.cursor()
@@ -56,4 +62,3 @@ async def check_db():
     if not os.path.exists(db_file):
         conn = await aiosqlite.connect(db_file)
         await conn.executescript(schema)
-    return 
