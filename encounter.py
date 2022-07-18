@@ -157,7 +157,14 @@ class QueueView(discord.ui.View):
     
     @discord.ui.button(label="Previous Turn", row=1)
     async def prevturn(self, button, interaction):
-        await self.encounter.next(-1)
+        # I HAVE A FEELING THIS IS VERY INEFFICIENT, PLEASE FIX
+        charactercount = len(self.encounter.characters)
+        delta = -1
+        index = self.encounter.turn+delta
+        while self.encounter.characters[index%charactercount+1].initiative == self.encounter.characters[index%charactercount].initiative and self.encounter.characters[0].initiative != self.encounter.characters[-1].initiative:
+            delta -= 1
+            index -= 1
+        await self.encounter.next(delta)
         queueembed = QueueEmbed(self.encounter) # inefficient asf wtf lmao
         await interaction.response.defer()
         await interaction.followup.edit_message(interaction.message.id, content=f"{queueembed.fields[0].name}'s turn!", embeds=[queueembed])
@@ -171,7 +178,14 @@ class QueueView(discord.ui.View):
 
     @discord.ui.button(label="Next Turn", row=1)
     async def nextturn(self, button, interaction):
-        await self.encounter.next(1)
+        # I ALSO HAVE A FEELING THIS IS VERY INEFFICIENT, FIX ALSO
+        charactercount = len(self.encounter.characters)
+        delta = 1
+        index = self.encounter.turn+delta
+        while self.encounter.characters[index%charactercount-1].initiative == self.encounter.characters[index%charactercount].initiative and self.encounter.characters[0].initiative != self.encounter.characters[-1].initiative:
+            delta += 1
+            index += 1
+        await self.encounter.next(delta)
         queueembed = QueueEmbed(self.encounter) # inefficient asf wtf lmao
         await interaction.response.defer()
         await interaction.followup.edit_message(interaction.message.id, content=f"{queueembed.fields[0].name}'s turn!", embeds=[queueembed])
