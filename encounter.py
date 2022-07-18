@@ -30,7 +30,7 @@ async def start(ctx, surprise: discord.Option(int, required = False, choices=[
 
     # reaction tracker would be great also
 
-    encounter = Encounter()
+    encounter = Encounter(surprise)
     initiativeview = InitiativeView(encounter)
     initiativeembed = InitiativeEmbed(title="Who's in the fight?", encounter=encounter)
     await ctx.respond("Encounter starting", embeds=[initiativeembed], view=initiativeview)
@@ -54,11 +54,15 @@ class InitiativeView(discord.ui.View):
 
     @discord.ui.button(label="Add player", style=discord.ButtonStyle.blurple)
     async def playercallback(self, button, interaction):
-        await interaction.response.send_modal(await CharacterModal.create(interaction.user, self.encounter, title="Add Player to Encounter"))
+        charactermodal = CharacterModal(self.encounter, title="Add Player to Encounter")
+        await charactermodal.create(interaction.user)
+        await interaction.response.send_modal(charactermodal)
     
     @discord.ui.button(label="Add enemy", style=discord.ButtonStyle.red)
     async def enemycallback(self, button, interaction):
-        await interaction.response.send_modal(await CharacterModal.create(interaction.user, self.encounter, isplayer=False, title="Add Enemy to Encounter"))
+        charactermodal = CharacterModal(self.encounter, isplayer=False, title="Add Enemy to Encounter")
+        await charactermodal.create(interaction.user)
+        await interaction.response.send_modal(charactermodal)
 
     @discord.ui.button(label="Begin encounter", style=discord.ButtonStyle.green)
     async def begin(self, button, interaction):
@@ -80,13 +84,12 @@ class InitiativeView(discord.ui.View):
         await interaction.followup.edit_message(interaction.message.id, content="Encounter cancelled.", view=None, embeds=[])
 
 class CharacterModal(discord.ui.Modal):
-    # not sure if completely necessary, could move getdice outside and pass output through parameters
-    @classmethod
-    async def create(cls, user, encounter, isplayer=True, *args, **kwargs):
-        self = CharacterModal(*args, **kwargs)
+    def __init__(self, encounter, isplayer=True, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.encounter = encounter
         self.isplayer = isplayer
-
+    
+    async def create(self, user):
         saveddice = await getdice(user.id)
         initiativeroll = '1d20'
         for dice in saveddice:
@@ -101,8 +104,6 @@ class CharacterModal(discord.ui.Modal):
             self.add_item(discord.ui.InputText(label="Character Name"))
             self.add_item(discord.ui.InputText(label="Initiative Roll", value='1d20'))
             self.add_item(discord.ui.InputText(label="Quantity", value=1))
-
-        return self
 
     async def callback(self, interaction):
         quantity = 1
@@ -131,7 +132,8 @@ class QueueEmbed(discord.Embed):
         for i in range(charactercount):
             index = (encounter.turn+i)%charactercount
             character = encounter.characters[index]
-            self.add_field(name=f"{index+1} - {character.name}", value=f"Initiative: {character.initiative} Statuses: `{character.statuses}`", inline=False)
+            statuses = [status for status in character.statuses if status[1] > 0]
+            self.add_field(name=f"{index+1} - {character.name}", value=f"Initiative: {character.initiative} Statuses: `{statuses}`", inline=False)
 
 class QueueView(discord.ui.View):
     def __init__(self, encounter, *args, **kwargs):
@@ -153,6 +155,13 @@ class QueueView(discord.ui.View):
     async def selectcallback(self, interaction):
         await interaction.response.defer()
     
+    @discord.ui.button(label="Previous Turn", row=1)
+    async def prevturn(self, button, interaction):
+        await self.encounter.next(-1)
+        queueembed = QueueEmbed(self.encounter) # inefficient asf wtf lmao
+        await interaction.response.defer()
+        await interaction.followup.edit_message(interaction.message.id, content=f"{queueembed.fields[0].name}'s turn!", embeds=[queueembed])
+
     @discord.ui.button(label="Print Character Name", row=1, disabled=True)
     async def printchar(self, button, interaction):
         if len(self.characterselect.values) > 0:
@@ -162,15 +171,16 @@ class QueueView(discord.ui.View):
 
     @discord.ui.button(label="Next Turn", row=1)
     async def nextturn(self, button, interaction):
-        await self.encounter.next()
+        await self.encounter.next(1)
         queueembed = QueueEmbed(self.encounter) # inefficient asf wtf lmao
         await interaction.response.defer()
         await interaction.followup.edit_message(interaction.message.id, content=f"{queueembed.fields[0].name}'s turn!", embeds=[queueembed])
 
 class Encounter():
-    def __init__(self):
+    def __init__(self, surprise):
         self.characters = []
         self.turn = 0
+        self.surprise = surprise
         print("encounter made")
 
     async def addcharacter(self, character):
@@ -192,13 +202,16 @@ class Encounter():
 
     async def sortinitiative(self):
         self.characters.sort(key=lambda x: x.initiative, reverse=True)
+        for i in range(len(self.characters)):
+            if self.characters[i].isplayer and self.surprise == 1 or not self.characters[i].isplayer and self.surprise == 2:
+                self.characters[i].statuses.append(("Surprise", i+1))
 
-    async def next(self):
-        self.turn += 1
+    async def next(self, delta):
+        self.turn += delta
 
         # theres probably a better way to do this tbh
         for character in self.characters:
-            character.statuses = [status.duration-1 for status in character.statuses]
+            character.statuses = [(status[0], status[1]-delta) for status in character.statuses]
 
 class Character():
     def __init__(self, name, initiativeroll, isplayer=True):
