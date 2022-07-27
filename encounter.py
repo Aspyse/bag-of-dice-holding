@@ -1,4 +1,3 @@
-from faulthandler import disable
 import discord
 from rolling_implementation import *
 from roll_aliases import *
@@ -18,13 +17,14 @@ async def start(ctx, surprise: discord.Option(int, required = False, choices=[
     # DONE ^ use saved dice "initiative" by default, roll if missing
     # DONE-ISH ^ (button) dm add enemy/ies with initiative roll(s)
     # (button) edit character and initiative roll notation
+    # (button) delete character
     # DONE (button?) cancel encounter
 
-    # (button) roll for initiatives, sort characters by initiative, SURPRISE IS STATUS
-    # ^ delete initiatives message and make new view for queue
+    # DONE (button) roll for initiatives, sort characters by initiative, SURPRISE IS STATUS
+    # DONE ^ delete initiatives message and make new view for queue
 
     # add status effect with duration
-    # track statuses with turn count
+    # DONE track statuses with turn count
     # move between turns
     # remove characters from queue
 
@@ -40,12 +40,6 @@ class InitiativeEmbed(discord.Embed):
         super().__init__(*args,**kwargs)
         for character in encounter.characters:
             self.add_field(name=character.name, value=f"Initiative roll: `{character.initiativeroll}`")
-
-#async def showinitiativeembed(encounter):
-#    initiativeembed = discord.Embed(title="Who's in the fight?")
-#    for character in encounter.characters:
-#        initiativeembed.add_field(name=character.name, value=f"Initiative roll: {character.initiativeroll}")
-#    return initiativeembed
 
 class InitiativeView(discord.ui.View):
     def __init__(self, encounter, *args, **kwargs):
@@ -70,7 +64,7 @@ class InitiativeView(discord.ui.View):
             for character in self.encounter.characters:
                 await character.rollinitiative()
             await self.encounter.sortinitiative()
-            queueembed = QueueEmbed(self.encounter)
+            queueembed = QueueEmbed()
             await interaction.response.defer()
 
             queueview = QueueView(self.encounter)
@@ -112,12 +106,12 @@ class CharacterModal(discord.ui.Modal):
         
         if quantity > 1:
             for i in range(quantity):
-                character = Character(f"{self.children[0].value} {i+1}", self.children[1].value, self.isplayer)
-                await self.encounter.addcharacter(character)
+                self.character = Character(f"{self.children[0].value} {i+1}", self.children[1].value, self.isplayer)
+                await self.encounter.addcharacter(self.character)
             await interaction.response.send_message(f"{self.children[0].value} ({quantity}) have been added.", ephemeral=True)
         else:
-            character = Character(f"{self.children[0].value}", self.children[1].value, self.isplayer)
-            await self.encounter.addcharacter(character)
+            self.character = Character(f"{self.children[0].value}", self.children[1].value, self.isplayer)
+            await self.encounter.addcharacter(self.character)
             await interaction.response.send_message(f"{self.children[0].value} has been added.", ephemeral=True)
 
         initiativeembed = InitiativeEmbed(title="Who's in the fight?", encounter=self.encounter)
@@ -127,13 +121,22 @@ class CharacterModal(discord.ui.Modal):
 class QueueEmbed(discord.Embed):
     def __init__(self, encounter, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        charactercount = len(encounter.characters)
+        self.encounter = encounter
+    
+    async def refresh(self):
+        charactercount = len(self.encounter.characters)
         initiative = 0 #TODO: SETTLE TIES
         for i in range(charactercount):
-            index = (encounter.turn+i)%charactercount
-            character = encounter.characters[index]
+            index = (self.encounter.turn+i)%charactercount
+            character = self.encounter.characters[index]
             statuses = [status for status in character.statuses if status[1] > 0]
             self.add_field(name=f"{index+1} - {character.name}", value=f"Initiative: {character.initiative} Statuses: `{statuses}`", inline=False)
+
+    async def insert_character(self, character):
+        index = 0
+        while character.initiative <= self.encounter.characters[index].initiative:
+            index += 1
+        self.insert_field_at(index, name=f"{index+1} - {character.name}", value=f"Initiative: {character.initiative} Statuses: `{character.statuses}`", inline=False)
 
 class QueueView(discord.ui.View):
     def __init__(self, encounter, *args, **kwargs):
@@ -147,7 +150,6 @@ class QueueView(discord.ui.View):
             placeholder="Select Character",
             options=characters,
             row=0,
-            disabled=True
         )
         self.characterselect.callback = self.selectcallback
         self.add_item(self.characterselect)
@@ -155,40 +157,62 @@ class QueueView(discord.ui.View):
     async def selectcallback(self, interaction):
         await interaction.response.defer()
     
-    @discord.ui.button(label="Previous Turn", row=1)
+    @discord.ui.button(label="Previous Turn", row=2)
     async def prevturn(self, button, interaction):
-        # I HAVE A FEELING THIS IS VERY INEFFICIENT, PLEASE FIX
-        charactercount = len(self.encounter.characters)
-        delta = -1
-        index = self.encounter.turn+delta
-        while self.encounter.characters[index%charactercount+1].initiative == self.encounter.characters[index%charactercount].initiative and self.encounter.characters[0].initiative != self.encounter.characters[-1].initiative:
-            delta -= 1
-            index -= 1
-        await self.encounter.next(delta)
-        queueembed = QueueEmbed(self.encounter) # inefficient asf wtf lmao
+        await self.encounter.next(-1)
+
+        queueembed = interaction.message.embeds[0]
+        await queueembed.refresh(self.encounter) # should be a bit more efficient
         await interaction.response.defer()
         await interaction.followup.edit_message(interaction.message.id, content=f"{queueembed.fields[0].name}'s turn!", embeds=[queueembed])
 
-    @discord.ui.button(label="Print Character Name", row=1, disabled=True)
+    @discord.ui.button(label="Next Turn", row=2)
+    async def nextturn(self, button, interaction):
+        await self.encounter.next(1)
+
+        queueembed = interaction.message.embeds[0]
+        await queueembed.refresh(self.encounter) # should be a bit more efficient
+        await interaction.response.defer()
+        await interaction.followup.edit_message(interaction.message.id, content=f"{queueembed.fields[0].name}'s turn!", embeds=[queueembed])
+
+    @discord.ui.button(label="Apply Status", row=1)
     async def printchar(self, button, interaction):
         if len(self.characterselect.values) > 0:
+            # pop up modal to add status and duration to selected character
             await interaction.response.send_message(self.characterselect.values[0], ephemeral=True)
         else:
             await interaction.response.send_message("Please select a character first.", ephemeral=True)
 
-    @discord.ui.button(label="Next Turn", row=1)
-    async def nextturn(self, button, interaction):
-        # I ALSO HAVE A FEELING THIS IS VERY INEFFICIENT, FIX ALSO
-        charactercount = len(self.encounter.characters)
-        delta = 1
-        index = self.encounter.turn+delta
-        while self.encounter.characters[index%charactercount-1].initiative == self.encounter.characters[index%charactercount].initiative and self.encounter.characters[0].initiative != self.encounter.characters[-1].initiative:
-            delta += 1
-            index += 1
-        await self.encounter.next(delta)
-        queueembed = QueueEmbed(self.encounter) # inefficient asf wtf lmao
+    @discord.ui.button(label="Eliminate Character", row=1)
+    async def printchar(self, button, interaction):
+        if len(self.characterselect.values) > 0:
+            # pop up view (list of buttons with character names and 'none') to select killer
+            await interaction.response.send_message(self.characterselect.values[0], ephemeral=True)
+        else:
+            await interaction.response.send_message("Please select a character first.", ephemeral=True)
+
+    @discord.ui.button(label="Player Join", row=3)
+    async def addplayer(self, button, interaction):
+        charactermodal = CharacterModal(self.encounter, title="Add Enemy to Encounter")
+        await charactermodal.create(interaction.user)
+        await interaction.response.send_modal(charactermodal)
+        await charactermodal.character.rollinitiative()
+
+        queueembed = interaction.message.embeds[0]
+        queueembed.insert_character(charactermodal.character)
         await interaction.response.defer()
-        await interaction.followup.edit_message(interaction.message.id, content=f"{queueembed.fields[0].name}'s turn!", embeds=[queueembed])
+        await interaction.followup.edit_message(interaction.message.id, embeds=[queueembed])
+
+    @discord.ui.button(label="Enemy Join", row=3)
+    async def addenemy(self, button, interaction):
+        charactermodal = CharacterModal(self.encounter, isplayer=False, title="Add Enemy to Encounter")
+        await charactermodal.create(interaction.user)
+        await interaction.response.send_modal(charactermodal)
+
+        queueembed = interaction.message.embeds[0]
+        queueembed.insert_character(charactermodal.character)
+        await interaction.response.defer()
+        await interaction.followup.edit_message(interaction.message.id, embeds=[queueembed])
 
 class Encounter():
     def __init__(self, surprise):
@@ -220,7 +244,14 @@ class Encounter():
             if self.characters[i].isplayer and self.surprise == 1 or not self.characters[i].isplayer and self.surprise == 2:
                 self.characters[i].statuses.append(("Surprise", i+1))
 
-    async def next(self, delta):
+    async def next(self, direction):
+        charactercount = len(self.characters)
+        delta = direction
+        # index = self.turn+delta
+        while self.encounter.characters[(self.turn+delta)%charactercount-direction].initiative == self.encounter.characters[(self.turn+delta)%charactercount].initiative and self.encounter.characters[0].initiative != self.encounter.characters[-1].initiative:
+            delta += direction
+            # index += direction 
+
         self.turn += delta
 
         # theres probably a better way to do this tbh
