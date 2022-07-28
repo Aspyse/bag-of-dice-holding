@@ -1,3 +1,4 @@
+import queue
 import discord
 from rolling_implementation import *
 from roll_aliases import *
@@ -64,10 +65,11 @@ class InitiativeView(discord.ui.View):
             for character in self.encounter.characters:
                 await character.rollinitiative()
             await self.encounter.sortinitiative()
-            queueembed = QueueEmbed()
-            await interaction.response.defer()
 
+            queueembed = QueueEmbed(self.encounter)
+            await queueembed.refresh()
             queueview = QueueView(self.encounter)
+            await interaction.response.defer()
             await interaction.followup.edit_message(interaction.message.id, content=f"{queueembed.fields[0].name}'s turn!", view=queueview, embeds=[queueembed])
         else:
             await interaction.response.send_message("Please add a character first.", ephemeral=True)
@@ -162,7 +164,7 @@ class QueueView(discord.ui.View):
         await self.encounter.next(-1)
 
         queueembed = interaction.message.embeds[0]
-        await queueembed.refresh(self.encounter) # should be a bit more efficient
+        await queueembed.refresh() # should be a bit more efficient
         await interaction.response.defer()
         await interaction.followup.edit_message(interaction.message.id, content=f"{queueembed.fields[0].name}'s turn!", embeds=[queueembed])
 
@@ -171,20 +173,19 @@ class QueueView(discord.ui.View):
         await self.encounter.next(1)
 
         queueembed = interaction.message.embeds[0]
-        await queueembed.refresh(self.encounter) # should be a bit more efficient
+        await queueembed.refresh() # should be a bit more efficient
         await interaction.response.defer()
         await interaction.followup.edit_message(interaction.message.id, content=f"{queueembed.fields[0].name}'s turn!", embeds=[queueembed])
 
     @discord.ui.button(label="Apply Status", row=1)
-    async def printchar(self, button, interaction):
+    async def applystatus(self, button, interaction):
         if len(self.characterselect.values) > 0:
-            # pop up modal to add status and duration to selected character
-            await interaction.response.send_message(self.characterselect.values[0], ephemeral=True)
+            await interaction.response.modal(StatusModal())
         else:
             await interaction.response.send_message("Please select a character first.", ephemeral=True)
 
     @discord.ui.button(label="Eliminate Character", row=1)
-    async def printchar(self, button, interaction):
+    async def elimchar(self, button, interaction):
         if len(self.characterselect.values) > 0:
             # pop up view (list of buttons with character names and 'none') to select killer
             await interaction.response.send_message(self.characterselect.values[0], ephemeral=True)
@@ -213,6 +214,24 @@ class QueueView(discord.ui.View):
         queueembed.insert_character(charactermodal.character)
         await interaction.response.defer()
         await interaction.followup.edit_message(interaction.message.id, embeds=[queueembed])
+
+class StatusModal(discord.ui.Modal):
+    def __init__(self, character, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.character = character
+        self.add_item(discord.ui.InputText(label="Status Name"))
+        self.add_item(discord.ui.InputText(label="Duration"))
+
+    async def callback(self, interaction):
+        duration = re.sub("[^0-9]", "", self.children[1].value)
+        if duration == None:
+            await interaction.response.send_message("Please input number of turns in status duration.", ephemeral=True)
+        else:
+            self.character.statuses.append([self.children[0].value, duration])
+            queueembed = interaction.message.embeds[0]
+            await queueembed.refresh()
+            await interaction.response.defer()
+            await interaction.followup.edit_message(interaction.message.id, embeds=[queueembed])
 
 class Encounter():
     def __init__(self, surprise):

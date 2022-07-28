@@ -38,7 +38,7 @@ async def clear(ctx):
 
 @dice.command(description="Open your bag of saved dice.")
 async def bag(ctx):
-    bagview = DiceBag(timeout=10)
+    bagview = DiceBag(timeout=300)
     await bagview.create(ctx.user.id, operation=0)
     await ctx.respond(f"**{ctx.user.display_name}'s dice bag**", view=bagview, ephemeral=True)
 
@@ -133,7 +133,7 @@ class StoreModal(discord.ui.Modal):
         saveexit = await storedice(interaction.user.id, self.children[0].value, self.children[1].value)
         await interaction.response.send_message(f"Dice **{saveexit[0]}** saved: `{saveexit[1]}`", ephemeral=True)
 
-        bagview = DiceBag(timeout=120)
+        bagview = DiceBag(timeout=300)
         await bagview.create(interaction.user.id, operation=0)
         await bagview.addplusbutton()
         await interaction.followup.edit_message(self.message, view=bagview)
