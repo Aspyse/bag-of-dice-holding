@@ -180,7 +180,7 @@ class QueueView(discord.ui.View):
     @discord.ui.button(label="Apply Status", row=1)
     async def applystatus(self, button, interaction):
         if len(self.characterselect.values) > 0:
-            await interaction.response.modal(StatusModal())
+            await interaction.response.send_modal(StatusModal())
         else:
             await interaction.response.send_message("Please select a character first.", ephemeral=True)
 
@@ -267,7 +267,7 @@ class Encounter():
         charactercount = len(self.characters)
         delta = direction
         # index = self.turn+delta
-        while self.encounter.characters[(self.turn+delta)%charactercount-direction].initiative == self.encounter.characters[(self.turn+delta)%charactercount].initiative and self.encounter.characters[0].initiative != self.encounter.characters[-1].initiative:
+        while self.characters[(self.turn+delta)%charactercount-direction].initiative == self.characters[(self.turn+delta)%charactercount].initiative and self.characters[0].initiative != self.characters[-1].initiative:
             delta += direction
             # index += direction 
 
