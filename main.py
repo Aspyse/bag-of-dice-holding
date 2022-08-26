@@ -4,11 +4,15 @@ intents = discord.Intents.default()
 activity = discord.Activity(type=discord.ActivityType.listening, name="/help tricks")
 bot = discord.Bot(activity=activity)
 
-from dice import dice
-bot.add_application_command(dice)
+#from dice import dice
+#bot.add_application_command(dice)
 
-from encounter import encountergroup
-bot.add_application_command(encountergroup)
+bot.load_extension('dice')
+
+#from encounter import encountergroup
+#bot.add_application_command(encountergroup)
+
+bot.load_extension('encounter')
 
 from chance import chance
 bot.add_application_command(chance)
