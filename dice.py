@@ -14,12 +14,12 @@ class DiceCog(discord.Cog):
         await ctx.respond(f"{ctx.author.display_name}'s {outroll[0]}: `{outroll[1]}` = {outroll[2]}")
 
     @dice.command(description="Save a die to your bag.")
-    async def save(self, ctx, alias: discord.Option(str), dice: discord.Option(str)):
-        saveexit = await storedice(ctx.author.id, alias, dice)
-        if saveexit == None:
+    async def save(self, ctx, alias: discord.Option(str), dice: discord.Option(str), emoji: discord.Option(str, required=False)):
+        try:
+            await storedice(ctx.author.id, alias, dice, emoji)
+            await ctx.respond(f"Dice **{alias}** saved: `{dice}`", ephemeral=True)
+        except Exception:
             await ctx.respond(f"Sorry, you can't have more than 25 dice stored at once. Please free up your bag with `/deletedice`, or edit an existing die with `/editdice`.", ephemeral=True)
-        else:
-            await ctx.respond(f"Dice **{saveexit[0]}** saved: `{saveexit[1]}`", ephemeral=True)
 
     @dice.command(description="Delete all saved dice.")
     async def clear(self, ctx):
@@ -61,33 +61,64 @@ class DiceCog(discord.Cog):
         await editview.create(ctx.user.id, operation=2)
         await ctx.respond(f"**Editing {ctx.user.display_name}'s dice**", view=editview, ephemeral=True)
 
+class StoreModal(discord.ui.Modal):
+    def __init__(self, message, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.message = message
+
+        self.add_item(discord.ui.InputText(label="Name"))
+        self.add_item(discord.ui.InputText(label="Emoji", required=False, placeholder="ex. 🗡️ or <dagger:1012766679555641354>"))
+        self.add_item(discord.ui.InputText(label="Dice Roll"))
+
+    async def callback(self, interaction):
+        await storedice(interaction.user.id, self.children[0].value, self.children[2].value, (self.children[1].value if self.children[1].value != "" else None))
+        await interaction.response.defer()
+
+        bagview = DiceBag(timeout=300)
+        await bagview.create(interaction.user.id, operation=0)
+        try:
+            await interaction.followup.edit_message(self.message, view=bagview)
+            await interaction.followup.send(f"Dice {self.children[1].value} **{self.children[0].value}** saved: `{self.children[2].value}`", ephemeral=True)
+        except discord.errors.HTTPException: # if wrong emoji? idk
+            await interaction.followup.send("Emoji was invalid. Type a backslash before the emoji and copy what is sent.", ephemeral=True)
+            await removedice(interaction.user.id, self.children[0].value)
+
 class EditModal(discord.ui.Modal):
-    def __init__(self, alias, command, message, *args, **kwargs) -> None:
+    def __init__(self, alias, command, message, emoji, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.alias = alias
         self.message = message
+        self.emoji = emoji
 
         self.add_item(discord.ui.InputText(label="Name", value=alias))
+        self.add_item(discord.ui.InputText(label="Emoji", value=emoji, required=False, placeholder="ex. 🗡️ or <dagger:1012766679555641354>"))
         self.add_item(discord.ui.InputText(label="Dice Roll", value=command))
 
     async def callback(self, interaction):
-        await updatedice(interaction.user.id, self.alias, self.children[0].value, self.children[1].value)
-        if self.alias == self.children[0].value:
-            await interaction.response.send_message(f"Dice **{self.children[0].value}** updated: `{self.children[1].value}`", ephemeral=True)
-        else:
-            await interaction.response.send_message(f"Dice **{self.alias}** updated to **{self.children[0].value}**: `{self.children[1].value}`", ephemeral=True)
-        
-        #might be more efficient to just edit one button but idk how :)
+        backupdice = await getdice(interaction.user.id)
+        for die in backupdice:
+            if die[1] == self.alias:
+                backupdie = die
+        await updatedice(interaction.user.id, self.alias, self.children[0].value, self.children[2].value, (self.children[1].value if self.children[1].value != "" else None))
+
         editview = DiceBag(timeout=120)
         await editview.create(interaction.user.id, operation=2)
-        await interaction.followup.edit_message(self.message, view=editview)
+        try:
+            await interaction.followup.edit_message(self.message, view=editview)
+            if self.alias == self.children[0].value:
+                await interaction.response.send_message(f"Dice {self.emoji} **{self.alias}** updated: `{self.children[2].value}`", ephemeral=True)
+            else:
+                await interaction.response.send_message(f"Dice {self.emoji} **{self.alias}** updated to {self.children[1].value} **{self.children[0].value}**: `{self.children[2].value}`", ephemeral=True)
+        except discord.errors.HTTPException: # again maybe if wrong emoji
+            await interaction.followup.send("Emoji was invalid. Type a backslash before the emoji and copy what is sent.", ephemeral=True)
+            await updatedice(interaction.user.id, self.children[0].value, self.alias, backupdie[2], backupdie[3])
 
 class DiceBag(discord.ui.View):
     # needs to be async to use getdice from aiosqlite
     async def create(self, user, operation):
         saveddice = await getdice(user)
         for die in saveddice:
-            self.add_item(DiceButton(label=die[1], command=die[2], operation=operation))
+            self.add_item(DiceButton(label=die[1], emoji=die[3], command=die[2], operation=operation))
         if operation == 0:
             await self.addplusbutton()
         elif operation == 1:
@@ -112,7 +143,6 @@ class DiceBag(discord.ui.View):
         self.add_item(donebutton)
 
 class DiceButton(discord.ui.Button):
-    # does not need to be async as long as callback is awaited
     def __init__(self, command, operation, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.command = command
@@ -138,11 +168,8 @@ class DiceButton(discord.ui.Button):
             await removedice(confirminteraction.user.id, self.label)
             await confirminteraction.response.defer()
 
-            #deleteview = DiceBag(timeout=120)
-            #await deleteview.create(interaction.user.id, operation=1)
             if len(interaction.message.components) > 1:
                 interaction.message.components.remove(self)
-                #await confirminteraction.followup.edit_message(interaction.message.id, view=deleteview)
             else:
                 await confirminteraction.followup.edit_message(interaction.message.id, content=f"{confirminteraction.user.display_name}'s dice bag is empty.", view=None)
 
@@ -160,23 +187,7 @@ class DiceButton(discord.ui.Button):
         await interaction.response.send_message(f"Are you sure you want to delete **{self.label}**?", view=confirmation, ephemeral=True)
 
     async def edit_callback(self, interaction):
-        await interaction.response.send_modal(EditModal(alias=self.label, command=self.command, message=interaction.message.id, title="Edit dice values"))
-
-class StoreModal(discord.ui.Modal):
-    def __init__(self, message, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.message = message
-
-        self.add_item(discord.ui.InputText(label="Name"))
-        self.add_item(discord.ui.InputText(label="Dice Roll"))
-
-    async def callback(self, interaction):
-        saveexit = await storedice(interaction.user.id, self.children[0].value, self.children[1].value)
-        await interaction.response.send_message(f"Dice **{saveexit[0]}** saved: `{saveexit[1]}`", ephemeral=True)
-
-        bagview = DiceBag(timeout=300)
-        await bagview.create(interaction.user.id, operation=0)
-        await interaction.followup.edit_message(self.message, view=bagview)
+        await interaction.response.send_modal(EditModal(alias=self.label, emoji=str(self.emoji), command=self.command, message=interaction.message.id, title="Edit dice values"))
 
 def setup(bot):
     bot.add_cog(DiceCog(bot))

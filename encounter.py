@@ -4,8 +4,6 @@ from discord.ext import commands
 from rolling_implementation import *
 from roll_aliases import *
 
-# encountergroup = discord.SlashCommandGroup("encounter", "Encounter commands from Bag of Dice Holding")
-
 class EncounterCog(discord.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -15,12 +13,12 @@ class EncounterCog(discord.Cog):
         discord.OptionChoice(name="Players", value=1),
         discord.OptionChoice(name="Enemies", value=2)])
     ):
-        print("encounter started")
-
         encounter = Encounter(surprise)
         initiativeview = InitiativeView(encounter)
         initiativeembed = InitiativeEmbed(title="Who's in the fight?", encounter=encounter)
         await ctx.respond("Encounter starting", embeds=[initiativeembed], view=initiativeview)
+
+# START OF INITIATIVE SCREEN
 
 class InitiativeEmbed(discord.Embed):
     def __init__(self, encounter, *args, **kwargs):
@@ -47,7 +45,7 @@ class InitiativeView(discord.ui.View):
         await charactermodal.create(interaction.user)
         await interaction.response.send_modal(charactermodal)
 
-    @discord.ui.button(label="Begin encounter", style=discord.ButtonStyle.green)
+    @discord.ui.button(label="Begin encounter", style=discord.ButtonStyle.green, row=1)
     async def begin(self, button, interaction):
         if len(self.encounter.characters) > 0:
             for character in self.encounter.characters:
@@ -55,14 +53,13 @@ class InitiativeView(discord.ui.View):
             await self.encounter.sortinitiative()
 
             queueview = QueueView(self.encounter)
-            await queueview.queueembed.refresh()
             await interaction.response.defer()
 
             await interaction.followup.edit_message(interaction.message.id, content=f"{await queueview.queueembed.get_moving()} may move.", view=queueview, embeds=[queueview.queueembed])
         else:
             await interaction.response.send_message("Please add a character first.", ephemeral=True)
 
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.gray)
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.gray, row=1)
     async def cancel(self, button, interaction):
         await interaction.response.defer()
         await interaction.followup.edit_message(interaction.message.id, content="Encounter cancelled.", view=None, embeds=[])
@@ -90,50 +87,48 @@ class CharacterModal(discord.ui.Modal):
             self.add_item(discord.ui.InputText(label="Quantity", value=1))
 
     async def callback(self, interaction):
-        quantity = 1
-        if len(self.children) > 2:
-            quantity = int(self.children[2].value)
+        quantity = int(self.children[2].value) if len(self.children) > 2 else 1
         
-        if quantity > 1 and len(self.encounter.characters) < 25:
-            currentlength = len(self.encounter.characters)
+        if len(self.encounter.characters) > 24:
+            await interaction.response.send_message("Character cap has already been reached. Please remove a character to proceed.", ephemeral=True)
+        elif quantity > 1:
             for i in range(quantity):
-                self.character = Character(f"{self.children[0].value} {i+1}", self.children[1].value, self.isplayer)
                 if (len(self.encounter.characters) < 25):
+                    self.character = Character(f"{self.children[0].value} {i+1}", self.children[1].value, self.isplayer)
                     await self.encounter.addcharacter(self.character)
+                    if i == quantity-1:
+                        await interaction.response.send_message(f"{self.children[0].value} ({quantity}) have been added.", ephemeral=True)
                 else:
                     await interaction.response.send_message(f"Only {self.children[0].value} ({i+1}) have been added. Reached character cap.", ephemeral=True)
-            if (25-currentlength <= quantity):
-                await interaction.response.send_message(f"{self.children[0].value} ({quantity}) have been added.", ephemeral=True)
-        elif quantity <= 1:
+        else:
             self.character = Character(f"{self.children[0].value}", self.children[1].value, self.isplayer)
             await self.encounter.addcharacter(self.character)
             await interaction.response.send_message(f"{self.children[0].value} has been added.", ephemeral=True)
-        else:
-            await interaction.response.send_message("Character cap has already been reached. Please remove a character to proceed.", ephemeral=True)
 
-        initiativeembed = InitiativeEmbed(title="Who's in the fight?", encounter=self.encounter) # TODO: IMPLEMENT A REFRESH
-        #initiativeview = InitiativeView(self.encounter)
-        #await interaction.followup.edit_message(interaction.message.id, content="Encounter starting", embeds=[initiativeembed], view=initiativeview)
+        initiativeembed = InitiativeEmbed(title="Who's in the fight?", encounter=self.encounter)
+        await interaction.followup.edit_message(interaction.message.id, embeds=[initiativeembed])
+
+# START OF QUEUE SCREEN
     
 class QueueEmbed(discord.Embed):
     def __init__(self, encounter, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.encounter = encounter
-    
-    async def refresh(self, delta): # TODO: MAKE MORE EFFICIENT?
-        charactercount = len(self.encounter.characters)
-        currentinitiative = 0
-        moves  = 0
 
-        for i in range(charactercount):
-            index = (self.encounter.turns+i)%charactercount
-            character = self.encounter.characters[index]
+        charactercount = len(self.encounter.characters)
+        lastinitiative = -1
+        turnstocharacter = 0
+        for k in range(charactercount):
+            # recreate the field content with directly updated values OR
+            # manipulate the content string (kinda unintuitive but might be efficient? idk)
+            character = self.encounter.characters[(self.encounter.current+k)%charactercount]
+            if character.initiative != lastinitiative:
+                turnstocharacter += 1
+                lastinitiative = character.initiative
             statuses = [(status[0], str(status[1]+" turns")) for status in character.statuses if status[1] > 0]
-            roundstatuses = [(status[0], str(status[1])+" rounds") for status in character.roundstatuses if status[1] > 0 and character is self.encounter.characters[self.encounter.current]]
-            if character.initiative != currentinitiative:
-                moves += 1
-                currentinitiative = character.initiative
-            self.add_field(name=f"{moves} - {character.name}", value=f"Initiative: {character.initiative} Attributes: `{statuses}{roundstatuses}`", inline=False)
+            roundstatuses = [(status[0], str(status[1])+" rounds") for status in character.roundstatuses if status[1] > 0]
+
+            self.add_field(name=f"{turnstocharacter} - {character.name}", value=f"Initiative: {character.initiative} Attributes: `{statuses}{roundstatuses}`", inline=False)
 
     async def insert_character(self, character):
         index = 0
@@ -158,14 +153,17 @@ class QueueEmbed(discord.Embed):
                 self.fields[(index-self.encounter.current)%charactercount].name = " ".join(name)
 
     async def get_moving(self):
-        # kinda ugly idk
         moving = []
-        index = 0
-        while self.fields[index].name.split(' ')[0] == self.fields[index+1].name.split(' ')[0]:
-            moving.append(self.fields[index].name.split(' ')[-1])
+        index = self.encounter.current
+        currentinitiative = self.encounter.characters[index].initiative
+        while self.encounter.characters[index].initiative == currentinitiative:
+            moving.append(self.encounter.characters[index].name)
             index += 1
-        moving.append("and " + self.fields[index].name.split(' ')[-1])
-        return ', '.join(moving)
+        if len(moving) > 1:
+            moving[-1] = f"and {moving[-1]}"
+            return ", ".join(moving) if len(moving) > 2 else " ".join(moving)
+        else:
+            return moving
 
 class QueueView(discord.ui.View):
     def __init__(self, encounter, *args, **kwargs):
@@ -190,7 +188,8 @@ class QueueView(discord.ui.View):
         for child in self.children:
             if child.row == 1:
                 child.disabled = False
-        await interaction.response.edit_message(interaction.message.id, view=self)
+        #await interaction.response.defer()
+        await interaction.response.edit_original_message(view=self)
     
     @discord.ui.button(label="Eliminate Character", row=1, style=discord.ButtonStyle.red, disabled=True)
     async def elimchar(self, button, interaction):
@@ -239,8 +238,7 @@ class QueueView(discord.ui.View):
     async def prevturn(self, button, interaction):
         await self.encounter.next(-1)
 
-        self.queueembed.clear_fields()
-        await self.queueembed.refresh()
+        queueembed = QueueEmbed(self.encounter)
         await interaction.response.defer()
         await interaction.followup.edit_message(interaction.message.id, content=f"{self.queueembed.fields[0].name}'s turn!", embeds=[self.queueembed])
         if (self.encounter.turns < 2):
@@ -256,8 +254,7 @@ class QueueView(discord.ui.View):
     async def nextturn(self, button, interaction):
         await self.encounter.next(1)
 
-        self.queueembed.clear_fields()
-        await self.queueembed.refresh()
+        queueembed = QueueEmbed(self.encounter)
         await interaction.response.defer()
         await interaction.followup.edit_message(interaction.message.id, content=f"{await self.queueembed.get_moving()} may move.", embeds=[self.queueembed])
         if (self.encounter.turns > 0):
@@ -313,17 +310,16 @@ class Encounter():
         self.turns = 0
         self.current = 0 # SHOULD ALWAYS MATCH INDEX OF CHARACTER MOVING
         self.surprise = surprise
-        print("encounter made")
 
     async def addcharacter(self, character):
+        self.characters.append(character)
         if self.characters.index(character) < self.current:
             self.current -= 1
-        self.characters.append(character)
 
     async def removecharacter(self, character):
+        self.characters.remove(character)
         if self.characters.index(character) < self.current:
             self.current += 1
-        self.characters.remove(character)
 
     async def getplayers(self):
         players = []
@@ -343,7 +339,7 @@ class Encounter():
         self.characters.sort(key=lambda x: x.initiative, reverse=True)
         for i in range(len(self.characters)):
             if self.characters[i].isplayer and self.surprise == 1 or not self.characters[i].isplayer and self.surprise == 2:
-                self.characters[i].statuses.append(("Surprise", i+1))
+                self.characters[i].roundstatuses.append(("Surprise", i+1))
 
     async def next(self, direction):
         charactercount = len(self.characters)
